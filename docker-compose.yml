@@ -42,6 +42,9 @@ services:
       # up to this; same sitekey stays serial (CF anti-abuse).
       MAX_WORKERS: "12"
       PORT: "9988"
+      # Your API server(s) skip the per-IP rate limit / ban / concurrency cap.
+      # Comma separated IPs or CIDRs, e.g. "1.2.3.4, 10.0.0.0/8".
+      # RATE_LIMIT_BYPASS_IPS: ""
       # Camoufox + byparr both egress through the WARP HTTP proxy.
       SOLVER_PROXY: "http://warp:8080"
       # Byparr (Camoufox + playwright-captcha) replaces FlareSolverr.

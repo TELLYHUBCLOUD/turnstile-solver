@@ -36,6 +36,14 @@ RATE_LIMIT_PER_MIN = int(os.environ.get("RATE_LIMIT_PER_MIN", 10))   # requests/
 MAX_CONCURRENT_PER_IP = int(os.environ.get("MAX_CONCURRENT_PER_IP", 5))  # in-flight/IP
 # Exceeding the rate limit bans the IP for this long (seconds; default 1 day).
 BAN_SECONDS = int(os.environ.get("BAN_SECONDS", 86400))
+# Client IPs / CIDRs that skip rate limit, ban and concurrency checks entirely
+# (your own servers). Comma separated: "1.2.3.4, 10.0.0.0/8". Checked AFTER
+# _client_ip(), so the entry means the verified peer, never a spoofable header.
+RATE_LIMIT_BYPASS = [
+    ipaddress.ip_network(x.strip(), strict=False)
+    for x in os.environ.get("RATE_LIMIT_BYPASS_IPS", "").split(",")
+    if x.strip()
+]
 # Dev escape hatch: let siteurl point at loopback / private / link-local
 # addresses (blocked by default to stop SSRF into the docker network).
 ALLOW_PRIVATE_TARGETS = os.environ.get("ALLOW_PRIVATE_TARGETS", "").lower() in ("1", "true", "yes")
@@ -289,6 +297,15 @@ def _client_ip(request: web.Request) -> str:
     return remote
 
 
+def _bypassed(ip: str) -> bool:
+    """Allowlisted client (own servers): no window, no ban, no concurrency cap."""
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    return any(addr in net for net in RATE_LIMIT_BYPASS)
+
+
 @web.middleware
 async def ratelimit_middleware(request: web.Request, handler):
     """Per-IP sliding-window rate limit + concurrent-solve cap on the solve
@@ -297,6 +314,8 @@ async def ratelimit_middleware(request: web.Request, handler):
         return await handler(request)
 
     ip = _client_ip(request)
+    if _bypassed(ip):
+        return await handler(request)
     now = time.time()
 
     # Already banned? Reject until the ban lifts.
@@ -642,8 +661,9 @@ def main():
 
     app = web.Application(client_max_size=MAX_BODY_BYTES,
                           middlewares=[auth_middleware, ratelimit_middleware])
-    log.info("anti-abuse: rate=%s/min/ip concurrency=%s/ip",
-             RATE_LIMIT_PER_MIN or "off", MAX_CONCURRENT_PER_IP or "off")
+    log.info("anti-abuse: rate=%s/min/ip concurrency=%s/ip bypass=%d net(s)",
+             RATE_LIMIT_PER_MIN or "off", MAX_CONCURRENT_PER_IP or "off",
+             len(RATE_LIMIT_BYPASS))
     if API_KEY:
         print("[solver] API key auth ENABLED", flush=True)
     else:
