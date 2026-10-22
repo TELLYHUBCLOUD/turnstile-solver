@@ -47,6 +47,7 @@ All values are environment variables. Defaults in `.env.example`.
 | `MAX_CONCURRENT_PER_IP` | `5` | In-flight solves per client IP. `0` = off. |
 | `BAN_SECONDS` | `86400` | Ban length. Bans persist in SQLite. |
 | `RATE_LIMIT_BYPASS_IPS` | unset | Client IPs / CIDRs (comma separated, e.g. `1.2.3.4, 10.0.0.0/8`) that skip rate limit, ban and concurrency checks entirely — for your own servers. Matches the verified client IP (the usual XFF rules apply first), never a raw header. Everyone behind the same NAT/proxy bypasses too, so pair with `API_KEY` when the port is reachable by others. |
+| `SOLVER_BIND` | `127.0.0.1` | Interface the port publishes on (compose interpolates it from `.env`). Keep loopback behind a reverse proxy; set `0.0.0.0` only with `API_KEY` when your own servers must reach it directly (e.g. over a tailnet). |
 | `DB_PATH` | `/data/solver.db` | SQLite file for bans and counters |
 | `ALLOW_PRIVATE_TARGETS` | unset | `1` allows `siteurl` on loopback / private / link-local hosts (dev only). |
 | `SOLVER_PROXY` | unset | Outbound HTTP proxy for the browser and Byparr, e.g. `http://warp:8080` |
