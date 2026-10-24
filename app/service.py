@@ -515,14 +515,17 @@ async def handle_solve(request: web.Request) -> web.Response:
         _stats["in_flight"] -= 1
 
 
+try:
+    with open(os.path.join(TEMPLATE_DIR, "index.html"), encoding="utf-8") as _f:
+        _PLAYGROUND_HTML = _f.read()   # read once, not per request
+except FileNotFoundError:
+    _PLAYGROUND_HTML = None
+
+
 async def handle_playground(request: web.Request) -> web.Response:
-    index_path = os.path.join(TEMPLATE_DIR, "index.html")
-    try:
-        with open(index_path, "r", encoding="utf-8") as f:
-            html = f.read()
-    except FileNotFoundError:
+    if _PLAYGROUND_HTML is None:
         return web.Response(text="playground template missing", status=500)
-    return web.Response(text=html, content_type="text/html")
+    return web.Response(text=_PLAYGROUND_HTML, content_type="text/html")
 
 
 _warp_state = "unknown"
