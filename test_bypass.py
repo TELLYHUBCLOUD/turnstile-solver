@@ -52,17 +52,20 @@ for _ in range(25):
     assert asyncio.run(svc.ratelimit_middleware(Req(), handler)) == "handled"
 assert "1.2.3.4" not in svc._ip_hits, "bypassed ip must not be counted"
 
-# a normal ip with an active ban is still rejected
 class Req2(Req):
     remote = "8.8.8.8"
 
 
+# default: limits off, so even an old persisted ban is ignored
 svc._ip_banned["8.8.8.8"] = 9_999_999_999.0
+assert asyncio.run(svc.ratelimit_middleware(Req2(), handler)) == "handled"
+
+# limit on: a normal ip with an active ban is rejected
+svc.RATE_LIMIT_PER_MIN = 3
 resp = asyncio.run(svc.ratelimit_middleware(Req2(), handler))
 assert getattr(resp, "status", None) == 429, resp
 
 # a normal ip over the minute limit still earns a ban
-svc.RATE_LIMIT_PER_MIN = 3
 svc._ip_banned.pop("8.8.8.8", None)
 for _ in range(3):
     asyncio.run(svc.ratelimit_middleware(Req2(), handler))

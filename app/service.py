@@ -32,8 +32,8 @@ MAX_BODY_BYTES = int(os.environ.get("MAX_BODY_BYTES", 64 * 1024))  # 64 KB
 API_KEY = os.environ.get("API_KEY", "").strip()
 
 # Anti-abuse (per client IP). 0 disables each check.
-RATE_LIMIT_PER_MIN = int(os.environ.get("RATE_LIMIT_PER_MIN", 10))   # requests/min/IP
-MAX_CONCURRENT_PER_IP = int(os.environ.get("MAX_CONCURRENT_PER_IP", 5))  # in-flight/IP
+RATE_LIMIT_PER_MIN = int(os.environ.get("RATE_LIMIT_PER_MIN", 0))   # requests/min/IP
+MAX_CONCURRENT_PER_IP = int(os.environ.get("MAX_CONCURRENT_PER_IP", 0))  # in-flight/IP
 # Exceeding the rate limit bans the IP for this long (seconds; default 1 day).
 BAN_SECONDS = int(os.environ.get("BAN_SECONDS", 86400))
 # Client IPs / CIDRs that skip rate limit, ban and concurrency checks entirely
@@ -318,8 +318,9 @@ async def ratelimit_middleware(request: web.Request, handler):
         return await handler(request)
     now = time.time()
 
-    # Already banned? Reject until the ban lifts.
-    ban_until = _ip_banned.get(ip)
+    # Already banned? Reject until the ban lifts. Bans only come from the rate
+    # limit, so with it off old persisted bans are ignored too.
+    ban_until = _ip_banned.get(ip) if RATE_LIMIT_PER_MIN > 0 else None
     if ban_until:
         if now < ban_until:
             retry = int(ban_until - now)
